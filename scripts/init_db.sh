@@ -26,7 +26,9 @@ DB_PORT="${POSTGRES_PORT:=5432}"
 # Chek if a custom host has been set otherwise default to 'localhost'
 DB_HOST="${POSTGRES_HOST:=localhost}"
 
-
+# skip if containert is already running
+if [[ -z "${SKIP_PODMAN}" ]]
+then
 # launch postgres using docker
 podman run \
        -e POSTGRES_USER=${DB_USER} \
@@ -36,6 +38,7 @@ podman run \
        -d postgres \
        postgres -N 1000
 #      Increased maximum number of connections for testing purposes
+fi
 
 # Keep pinging Postgres until it's ready to accept commands
 export PGPASSWORD="${DB_PASSWORD}"
@@ -50,3 +53,6 @@ DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAM
 export DATABASE_URL
 
 sqlx database create
+sqlx migrate run
+
+>&2 echo "Postgres has been migrated, ready to go!"
