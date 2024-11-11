@@ -5,6 +5,8 @@ use std::net::TcpListener;
 use sqlx::{ Connection, Executor, PgConnection, PgPool };
 use uuid::Uuid;
 use once_cell::sync::Lazy;
+use secrecy::ExposeSecret;
+
 
 // Ensure thet the 'tracing' stack is only initialized once using 'one cell'
 static TRACING: Lazy<()> = Lazy::new(|| {
@@ -76,7 +78,7 @@ async fn spawn_app() -> TestApp {
 
 async fn configure_database(config: &DatabaseSettings) -> PgPool {
     let mut connection = PgConnection::connect(
-        &config.connection_string_without_db()
+        &config.connection_string_without_db().expose_secret()
     )
         .await
         .expect("Failed to connect to Postgres.");
@@ -87,7 +89,7 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .expect("Failed to create database");
 
     // Migrate database
-    let connection_pool = PgPool::connect(&config.connection_string())
+    let connection_pool = PgPool::connect(&config.connection_string().expose_secret())
         .await
         .expect("Failed to connect to Postgres");
     sqlx::migrate!("./migrations")
@@ -104,12 +106,6 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
 async fn subscribe_returns_200_for_valid_form_data() {
     let app = spawn_app().await;
     
-    let configuration = get_configuration().expect("Failed to read configuration");
-    let connection_string = configuration.database.connection_string();
-    let mut connection = PgConnection::connect(&connection_string)
-        .await
-        .expect("Failed to connect to postgres");
-
     let client = reqwest::Client::new();
 
 
@@ -126,7 +122,7 @@ async fn subscribe_returns_200_for_valid_form_data() {
     assert_eq!(200, response.status().as_u16());
 
     let saved = sqlx::query!("SELECT email, name FROM subscriptions")
-        .fetch_one(&mut connection)
+        .fetch_one(&app.db_pool)
         .await
         .expect("Failed to fetch saved subscription");
 

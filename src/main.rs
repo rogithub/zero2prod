@@ -3,6 +3,7 @@ use zero2prod::startup::run;
 use zero2prod::telemetry::{ get_subscriber, init_subscriber };
 use zero2prod::configuration::get_configuration;
 use sqlx::PgPool;
+use secrecy::ExposeSecret;
 
 #[tokio::main]
 async fn main() -> Result<(),std::io::Error> {
@@ -14,7 +15,7 @@ async fn main() -> Result<(),std::io::Error> {
     init_subscriber(subscriber);
 
     let configuration = get_configuration().expect("Failed to read configuration");
-    let connection_pool = PgPool::connect(&configuration.database.connection_string())
+    let connection_pool = PgPool::connect(&configuration.database.connection_string().expose_secret())
         .await
         .expect("Failed to conect to Postgres.");
 
