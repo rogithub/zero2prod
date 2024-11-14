@@ -1,7 +1,9 @@
  
 use secrecy::{ExposeSecret, Secret};
 use serde_aux::field_attributes::deserialize_number_from_string;
-use sqlx::postgres::PgConnectOptions;
+use sqlx::{postgres::{PgConnectOptions, PgSslMode}, ConnectOptions};
+
+
 /// The possible runtime environment for our application
 pub enum Environment {
     Local,
@@ -45,6 +47,7 @@ pub struct ApplicationSettings {
 
 #[derive(serde::Deserialize)]
 pub struct DatabaseSettings {
+    pub require_ssl: bool,
     pub username: String,
     pub password: Secret<String>,
     #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -55,11 +58,21 @@ pub struct DatabaseSettings {
 
 impl DatabaseSettings {
     pub fn with_db(&self) -> PgConnectOptions {
-        self.without_db().database(&self.database_name)
+        let mut options = self.without_db().database(&self.database_name);
+        options.log_statements(tracing_log::log::LevelFilter::Trace);
+        options
     }
 
     pub fn without_db(&self) -> PgConnectOptions {
+        
+        let ssl_mode = if self.require_ssl {
+            PgSslMode::Require
+        } else {
+            PgSslMode::Prefer
+        };
+
         PgConnectOptions::new()
+            .ssl_mode(ssl_mode)
             .host(&self.host)
             .username(&self.username)
             .password(&self.password.expose_secret())
